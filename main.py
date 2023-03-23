@@ -37,7 +37,6 @@ def handle_request():
     if "prompt" not in params:
         return jsonify({"error": "prompt is required"}), 400
 
-    api_key = params["api_key"]
     matching_keys = [key for key in data["api_keys"] if key["api_key"] == api_key]
     if len(matching_keys) == 0:
         return jsonify({"error": "Invalid API key"}), 401
