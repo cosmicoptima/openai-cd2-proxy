@@ -86,7 +86,7 @@ def handle_pending_requests():
                 **shared_params
             )
 
-            if "n" in dict(key):
+            if "n" in shared_params:
                 n = shared_params["n"]
             else:
                 n = 1
