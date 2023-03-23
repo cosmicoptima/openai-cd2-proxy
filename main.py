@@ -8,7 +8,8 @@ from threading import Event, Lock, Thread
 import time
 
 app = Flask(__name__)
-openai.api_key = getenv("OPENAI_API_KEY")
+openai.api_key = getenv("OCP_OPENAI_API_KEY")
+openai.organization = getenv("OCP_OPENAI_ORG")
 
 pending_requests = {}
 lock = Lock()
@@ -44,24 +45,31 @@ def handle_request():
 def handle_pending_requests():
     while True:
         with lock:
-            key = dict(next(iter(pending_requests), None))
+            if not pending_requests:
+                continue
+
+            key = next(iter(pending_requests))
             values = pending_requests[key]
 
             prompts = [value["prompt"] for value in values]
 
             response = openai.Completion.create(
                 prompt=prompts,
-                **key
+                **dict(key)
             )
 
+            if "n" in dict(key):
+                n = dict(key)["n"]
+            else:
+                n = 1
             choices = response["choices"]
-            grouped_choices = [choices[i:i + key["n"]] for i in range(0, len(choices), key["n"])]
+            grouped_choices = [choices[i:i + n] for i in range(0, len(choices), n)]
 
             for value, choices in zip(values, grouped_choices):
                 value["response"] = {"choices": choices}
                 value["event"].set()
 
-            key_to_delete = tuple(sorted(key.items()))
+            key_to_delete = key
 
         time.sleep(3)
 
@@ -69,6 +77,7 @@ def handle_pending_requests():
             del pending_requests[key_to_delete]
 
 
+Thread(target=handle_pending_requests, daemon=True).start()
+
 if __name__ == "__main__":
-    Thread(target=handle_pending_requests, daemon=True).start()
     app.run()
