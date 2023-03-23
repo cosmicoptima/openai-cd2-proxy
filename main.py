@@ -34,7 +34,9 @@ def handle_request():
     api_key = params["api_key"]
     if not api_keys.find_one(api_key=api_key):
         return jsonify({"error": "invalid api_key"}), 401
-    usage.insert(dict(api_key=api_key, timestamp=time.time()))
+
+    name = api_keys.find_one(api_key=api_key)["name"]
+    usage.insert(dict(name=name, timestamp=time.time()))
     
     params["model"] = "code-davinci-002"
 
