@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, jsonify, request
+import hashlib
 import json
 import openai
 from os import getenv
@@ -49,19 +50,21 @@ def handle_request():
 
     event = Event()
 
-    key = tuple(sorted(shared_params.items()))
+    sha256 = hashlib.sha256()
+    sha256.update(json.dumps(tuple(sorted(params.items()))).encode("utf-8"))
+    key = sha256.digest()
     value = {"prompt": prompt, "event": event}
 
     with lock:
         if key not in pending_requests:
-            pending_requests[key] = [value]
+            pending_requests[key] = {"shared_params": shared_params, "values": [value]}
         else:
-            pending_requests[key].append(value)
+            pending_requests[key]["values"].append(value)
 
     event.wait()
 
     with lock:
-        for value in pending_requests[key]:
+        for value in pending_requests[key]["values"]:
             if value["prompt"] == prompt:
                 return jsonify(value["response"])
         
@@ -73,17 +76,18 @@ def handle_pending_requests():
                 continue
 
             key = next(iter(pending_requests))
-            values = pending_requests[key]
+            shared_params = pending_requests[key]["shared_params"]
+            values = pending_requests[key]["values"]
 
             prompts = [value["prompt"] for value in values]
 
             response = openai.Completion.create(
                 prompt=prompts,
-                **dict(key)
+                **shared_params
             )
 
             if "n" in dict(key):
-                n = dict(key)["n"]
+                n = shared_params["n"]
             else:
                 n = 1
             choices = response["choices"]
