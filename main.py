@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import dataset
 from flask import Flask, jsonify, request
+import json
 import openai
 from os import getenv
 from sys import argv
@@ -17,9 +17,11 @@ openai.organization = getenv("OCP_OPENAI_ORG")
 pending_requests = {}
 lock = Lock()
 
-db = dataset.connect("sqlite:///db.sqlite3")
-api_keys = db["api_keys"]
-usage = db["requests"]
+try:
+    with open("data.json") as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {"api_keys": [], "usage": []}
 
 
 @app.route("/v1/completions", methods=["POST"])
@@ -32,9 +34,10 @@ def handle_request():
         return jsonify({"error": "api_key is required"}), 400
 
     api_key = params["api_key"]
-    if not api_keys.find_one(api_key=api_key):
+    matching_keys = [key for key in data["api_keys"] if key["api_key"] == api_key]
+    if len(matching_keys) == 0:
         return jsonify({"error": "invalid api_key"}), 401
-    usage.insert(dict(api_key=api_key, timestamp=time.time()))
+    data["usage"].append({"name": matching_keys[0]["name"], "time": time.time()})
     
     params["model"] = "code-davinci-002"
 
@@ -95,39 +98,43 @@ def handle_pending_requests():
             del pending_requests[key_to_delete]
 
 
-if __name__ == "__main__":
-    if len(argv) > 1 and argv[1] == "add-key":
-        if len(argv) != 3:
-            print("Usage: main.py add-key [name]")
+try:
+    if __name__ == "__main__":
+        if len(argv) > 1 and argv[1] == "add-key":
+            if len(argv) != 3:
+                print("Usage: main.py add-key [name]")
+                exit(1)
+        
+            name = argv[2]
+            api_key = str(uuid4())
+       
+            data["api_keys"].append({"name": name, "api_key": api_key})
+            print(f"Added key {api_key} for {name}")
+        elif len(argv) > 1 and argv[1] == "delete-key":
+            if len(argv) != 3:
+                print("Usage: main.py delete-key [name]")
+                exit(1)
+        
+            name = argv[2]
+        
+            data["api_keys"] = [key for key in data["api_keys"] if key["name"] != name]
+            print(f"Deleted key for {name}")
+        elif len(argv) > 1 and argv[1] == "list-keys":
+            if len(argv) != 2:
+                print("Usage: main.py list-keys")
+                exit(1)
+        
+            for key in data["api_keys"]:
+                print(f"{key['name']}: {key['api_key']}")
+        elif len(argv) > 1:
+            print("Usage: main.py [add-key|delete-key|list-keys]")
             exit(1)
+        else:
+            Thread(target=handle_pending_requests, daemon=True).start()
+            app.run()
     
-        name = argv[2]
-        api_key = str(uuid4())
-   
-        api_keys.insert(dict(name=name, api_key=api_key))
-        print(f"Added key {api_key} for {name}")
-    elif len(argv) > 1 and argv[1] == "delete-key":
-        if len(argv) != 3:
-            print("Usage: main.py delete-key [name]")
-            exit(1)
-    
-        name = argv[2]
-    
-        api_keys.delete(name=name)
-        print(f"Deleted key for {name}")
-    elif len(argv) > 1 and argv[1] == "list-keys":
-        if len(argv) != 2:
-            print("Usage: main.py list-keys")
-            exit(1)
-    
-        for key in api_keys:
-            print(f"{key['name']}: {key['api_key']}")
-    elif len(argv) > 1:
-        print("Usage: main.py [add-key|delete-key|list-keys]")
-        exit(1)
     else:
         Thread(target=handle_pending_requests, daemon=True).start()
-        app.run()
-
-else:
-    Thread(target=handle_pending_requests, daemon=True).start()
+finally:
+    with open("data.json", "w") as f:
+        json.dump(data, f)
