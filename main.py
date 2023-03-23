@@ -28,19 +28,22 @@ except FileNotFoundError:
 def handle_request():
     params = request.get_json()
 
+    api_key_full = request.headers.get("Authorization")
+    if api_key_full.startswith("Bearer "):
+        api_key = api_key_full[7:]
+    else:
+        return jsonify({"error": "Invalid API key"}), 401
+
     if "prompt" not in params:
         return jsonify({"error": "prompt is required"}), 400
-    if "api_key" not in params:
-        return jsonify({"error": "api_key is required"}), 400
 
     api_key = params["api_key"]
     matching_keys = [key for key in data["api_keys"] if key["api_key"] == api_key]
     if len(matching_keys) == 0:
-        return jsonify({"error": "invalid api_key"}), 401
+        return jsonify({"error": "Invalid API key"}), 401
     data["usage"].append({"name": matching_keys[0]["name"], "time": time.time()})
     
     params["model"] = "code-davinci-002"
-    del params["api_key"]
 
     prompt = params["prompt"]
     shared_params = {k: v for k, v in params.items() if k != "prompt"}
