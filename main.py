@@ -40,6 +40,7 @@ def handle_request():
     data["usage"].append({"name": matching_keys[0]["name"], "time": time.time()})
     
     params["model"] = "code-davinci-002"
+    del params["api_key"]
 
     prompt = params["prompt"]
     shared_params = {k: v for k, v in params.items() if k != "prompt"}
