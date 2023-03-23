@@ -97,13 +97,13 @@ def handle_pending_requests():
 
 if __name__ == "__main__":
     if len(argv) > 1 and argv[1] == "add-key":
-        if len(argv) != 4:
-            print("Usage: main.py add-key [name] [api_key]")
+        if len(argv) != 3:
+            print("Usage: main.py add-key [name]")
             exit(1)
     
         name = argv[2]
-        api_key = argv[3]
-    
+        api_key = str(uuid4())
+   
         api_keys.insert(dict(name=name, api_key=api_key))
         print(f"Added key {api_key} for {name}")
     elif len(argv) > 1 and argv[1] == "delete-key":
