@@ -42,6 +42,9 @@ def handle_request():
     if len(matching_keys) == 0:
         return jsonify({"error": "Invalid API key"}), 401
     data["usage"].append({"name": matching_keys[0]["name"], "time": time.time()})
+
+    with open("data.json", "w") as f:
+        json.dump(data, f)
     
     params["model"] = "code-davinci-002"
 
