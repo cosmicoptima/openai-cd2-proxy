@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import hashlib
 import json
 import openai
@@ -12,6 +13,7 @@ import time
 from uuid import uuid4
 
 app = Flask(__name__)
+CORS(app)
 openai.api_key = getenv("OCP_OPENAI_API_KEY")
 openai.organization = getenv("OCP_OPENAI_ORG")
 
