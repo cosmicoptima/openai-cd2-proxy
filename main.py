@@ -20,17 +20,22 @@ openai.organization = getenv("OCP_OPENAI_ORG")
 pending_requests = {}
 lock = Lock()
 
-try:
-    with open("data.json") as f:
-        data = json.load(f)
-except FileNotFoundError:
-    data = {"api_keys": [], "usage": []}
+def load_data():
+    global data
+    try:
+        with open("data.json") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        data = {"api_keys": [], "usage": []}
+
+load_data()
 
 
 @app.route("/v1/completions", methods=["POST"])
 def handle_request():
     params = request.get_json()
 
+    load_data()
     api_key_full = request.headers.get("Authorization")
     if api_key_full.startswith("Bearer "):
         api_key = api_key_full[7:]
