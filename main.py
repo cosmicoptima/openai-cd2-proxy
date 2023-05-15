@@ -1,16 +1,20 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, jsonify, request
-from flask_cors import CORS
 import hashlib
 import json
-import openai
+import time
+
 from os import getenv
 from sys import argv
 from threading import Event, Lock, Thread
-import time
 from uuid import uuid4
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+import openai
+import tiktoken
 
 app = Flask(__name__)
 CORS(app)
@@ -29,6 +33,8 @@ def load_data():
         data = {"api_keys": [], "usage": []}
 
 load_data()
+
+encoding = tiktoken.encoding_for_model("code-davinci-002")
 
 
 @app.route("/v1/completions", methods=["POST"])
@@ -104,7 +110,10 @@ def handle_pending_requests():
             grouped_choices = [choices[i:i + n] for i in range(0, len(choices), n)]
 
             for value, choices in zip(values, grouped_choices):
-                value["response"] = {"choices": choices}
+                value["response"] = {
+                    "choices": choices,
+                    "usage": create_usage_dict(values, choices)
+                }
                 value["event"].set()
 
             key_to_delete = key
@@ -113,6 +122,17 @@ def handle_pending_requests():
 
         with lock:
             del pending_requests[key_to_delete]
+
+
+def create_usage_dict(value, choices):
+    usage_dict = {
+        "prompt_tokens": len(encoding.encode(value["prompt"])),
+        "completion_tokens": sum([len(encoding.encode(choice["text"])) for choice in choices])
+    }
+    usage_dict["total_tokens"] = usage_dict["prompt_tokens"] + usage_dict["response_tokens"]
+    if usage_dict["completion_tokens"] == 0:
+        usage_dict["completion_tokens"] = None
+    return usage_dict
 
 
 try:
