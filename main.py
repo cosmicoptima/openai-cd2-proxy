@@ -1,16 +1,19 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, jsonify, request
-from flask_cors import CORS
 import hashlib
 import json
-import openai
+import time
+
 from os import getenv
 from sys import argv
 from threading import Event, Lock, Thread
-import time
 from uuid import uuid4
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+import openai
 import tiktoken
 
 app = Flask(__name__)
@@ -31,7 +34,7 @@ def load_data():
 
 load_data()
 
-encoding = tiktoken.get_encoding("gpt2")
+encoding = tiktoken.encoding_for_model("code-davinci-002")
 
 
 @app.route("/v1/completions", methods=["POST"])
@@ -127,6 +130,8 @@ def create_usage_dict(value, choices):
         "completion_tokens": sum([len(encoding.encode(choice["text"])) for choice in choices])
     }
     usage_dict["total_tokens"] = usage_dict["prompt_tokens"] + usage_dict["response_tokens"]
+    if usage_dict["completion_tokens"] == 0:
+        usage_dict["completion_tokens"] = None
     return usage_dict
 
 
