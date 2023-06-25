@@ -11,11 +11,12 @@ from sys import argv
 from threading import Event, Lock, Thread
 import time
 from uuid import uuid4
+import tiktoken
 
 app = Flask(__name__)
 CORS(app)
-openai.api_key = getenv("OCP_OPENAI_API_KEY")
-openai.organization = getenv("OCP_OPENAI_ORG")
+openai.api_key = getenv("OCP_OPENAI_API_KEY", getenv("OPENAI_API_KEY"))
+openai.organization = getenv("OCP_OPENAI_ORG", "")
 
 pending_requests = {}
 lock = Lock()
@@ -29,6 +30,9 @@ def load_data():
         data = {"api_keys": [], "usage": []}
 
 load_data()
+
+
+encoding = tiktoken.encoding_for_model("code-davinci-002")
 
 
 @app.route("/v1/completions", methods=["POST"])
@@ -52,7 +56,7 @@ def handle_request():
 
     with open("data.json", "w") as f:
         json.dump(data, f)
-    
+
     params["model"] = "code-davinci-002"
 
     prompt = params["prompt"]
@@ -77,7 +81,7 @@ def handle_request():
         for value in pending_requests[key]["values"]:
             if value["prompt"] == prompt:
                 return jsonify(value["response"])
-        
+
 
 def handle_pending_requests():
     while True:
@@ -104,7 +108,10 @@ def handle_pending_requests():
             grouped_choices = [choices[i:i + n] for i in range(0, len(choices), n)]
 
             for value, choices in zip(values, grouped_choices):
-                value["response"] = {"choices": choices}
+                value["response"] = {
+                    "choices": choices,
+                    "usage": create_usage_dict(value, choices)
+                }
                 value["event"].set()
 
             key_to_delete = key
@@ -115,32 +122,43 @@ def handle_pending_requests():
             del pending_requests[key_to_delete]
 
 
+def create_usage_dict(value, choices):
+    usage_dict = {
+        "prompt_tokens": len(encoding.encode(value["prompt"])),
+        "completion_tokens": sum([len(encoding.encode(choice["text"])) for choice in choices])
+    }
+    usage_dict["total_tokens"] = usage_dict["prompt_tokens"] + usage_dict["completion_tokens"]
+    if usage_dict["completion_tokens"] == 0:
+        usage_dict["completion_tokens"] = None
+    return usage_dict
+
+
 try:
     if __name__ == "__main__":
         if len(argv) > 1 and argv[1] == "add-key":
             if len(argv) != 3:
                 print("Usage: main.py add-key [name]")
                 exit(1)
-        
+
             name = argv[2]
             api_key = str(uuid4())
-       
+
             data["api_keys"].append({"name": name, "api_key": api_key})
             print(f"Added key {api_key} for {name}")
         elif len(argv) > 1 and argv[1] == "delete-key":
             if len(argv) != 3:
                 print("Usage: main.py delete-key [name]")
                 exit(1)
-        
+
             name = argv[2]
-        
+
             data["api_keys"] = [key for key in data["api_keys"] if key["name"] != name]
             print(f"Deleted key for {name}")
         elif len(argv) > 1 and argv[1] == "list-keys":
             if len(argv) != 2:
                 print("Usage: main.py list-keys")
                 exit(1)
-        
+
             for key in data["api_keys"]:
                 print(f"{key['name']}: {key['api_key']}")
         elif len(argv) > 1:
@@ -149,7 +167,7 @@ try:
         else:
             Thread(target=handle_pending_requests, daemon=True).start()
             app.run()
-    
+
     else:
         Thread(target=handle_pending_requests, daemon=True).start()
 finally:
