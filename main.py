@@ -55,7 +55,7 @@ def handle_request():
 
     with open("data.json", "w") as f:
         json.dump(data, f)
-    
+
     params["model"] = "code-davinci-002"
 
     prompt = params["prompt"]
@@ -80,7 +80,7 @@ def handle_request():
         for value in pending_requests[key]["values"]:
             if value["prompt"] == prompt:
                 return jsonify(value["response"])
-        
+
 
 def handle_pending_requests():
     while True:
@@ -136,26 +136,26 @@ try:
             if len(argv) != 3:
                 print("Usage: main.py add-key [name]")
                 exit(1)
-        
+
             name = argv[2]
             api_key = str(uuid4())
-       
+
             data["api_keys"].append({"name": name, "api_key": api_key})
             print(f"Added key {api_key} for {name}")
         elif len(argv) > 1 and argv[1] == "delete-key":
             if len(argv) != 3:
                 print("Usage: main.py delete-key [name]")
                 exit(1)
-        
+
             name = argv[2]
-        
+
             data["api_keys"] = [key for key in data["api_keys"] if key["name"] != name]
             print(f"Deleted key for {name}")
         elif len(argv) > 1 and argv[1] == "list-keys":
             if len(argv) != 2:
                 print("Usage: main.py list-keys")
                 exit(1)
-        
+
             for key in data["api_keys"]:
                 print(f"{key['name']}: {key['api_key']}")
         elif len(argv) > 1:
@@ -164,7 +164,7 @@ try:
         else:
             Thread(target=handle_pending_requests, daemon=True).start()
             app.run()
-    
+
     else:
         Thread(target=handle_pending_requests, daemon=True).start()
 finally:
