@@ -6,7 +6,7 @@ run:
   poetry run uvicorn main:app
 
 test:
-  curl http://localhost:8000/v1/completions \
+  curl -X POST http://localhost:8000/v1/completions \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -d '{ \
