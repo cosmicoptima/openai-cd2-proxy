@@ -15,8 +15,8 @@ import tiktoken
 
 app = Flask(__name__)
 CORS(app)
-openai.api_key = getenv("OCP_OPENAI_API_KEY")
-openai.organization = getenv("OCP_OPENAI_ORG")
+openai.api_key = getenv("OCP_OPENAI_API_KEY", getenv("OPENAI_API_KEY"))
+openai.organization = getenv("OCP_OPENAI_ORG", "")
 
 pending_requests = {}
 lock = Lock()
@@ -31,7 +31,8 @@ def load_data():
 
 load_data()
 
-encoding = tiktoken.get_encoding("gpt2")
+
+encoding = tiktoken.encoding_for_model("code-davinci-002")
 
 
 @app.route("/v1/completions", methods=["POST"])
@@ -56,7 +57,7 @@ def handle_request():
     with open("data.json", "w") as f:
         json.dump(data, f)
 
-    params["model"] = "code-davinci-002"
+    params["model"] = "ada"
 
     prompt = params["prompt"]
     shared_params = {k: v for k, v in params.items() if k != "prompt"}
@@ -109,7 +110,7 @@ def handle_pending_requests():
             for value, choices in zip(values, grouped_choices):
                 value["response"] = {
                     "choices": choices,
-                    "usage": create_usage_dict(values, choices)
+                    "usage": create_usage_dict(value, choices)
                 }
                 value["event"].set()
 
@@ -126,7 +127,9 @@ def create_usage_dict(value, choices):
         "prompt_tokens": len(encoding.encode(value["prompt"])),
         "completion_tokens": sum([len(encoding.encode(choice["text"])) for choice in choices])
     }
-    usage_dict["total_tokens"] = usage_dict["prompt_tokens"] + usage_dict["response_tokens"]
+    usage_dict["total_tokens"] = usage_dict["prompt_tokens"] + usage_dict["completion_tokens"]
+    if usage_dict["completion_tokens"] == 0:
+        usage_dict["completion_tokens"] = None
     return usage_dict
 
 

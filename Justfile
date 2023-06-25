@@ -1,9 +1,11 @@
 install:
   sudo apt-get install python3-flask-cors
   poetry install
+  echo You may need the next line to get gunicorn to work?
+  poetry run pip install --force-reinstall -U setuptools
 
 run:
-  poetry run uvicorn main:app
+  poetry run gunicorn main:app --reload
 
 test:
   curl -X POST http://localhost:8000/v1/completions \
