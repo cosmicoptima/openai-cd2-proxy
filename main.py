@@ -57,7 +57,7 @@ def handle_request():
     with open("data.json", "w") as f:
         json.dump(data, f)
 
-    params["model"] = "ada"
+    params["model"] = "code-davinci-002"
 
     prompt = params["prompt"]
     shared_params = {k: v for k, v in params.items() if k != "prompt"}
